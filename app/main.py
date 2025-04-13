@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from app.routers import auth # Import other routers later (documents, chat)
+from app.routers import auth, documents # Import other router later (chat)
 from app.db.database import init_db, engine
 from app.core.config import settings # Import settings if needed directly
 
@@ -29,8 +29,8 @@ app = FastAPI(
 
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
-# Add other routers here later:
-# app.include_router(documents.router, prefix="/documents", tags=["Documents"])
+app.include_router(documents.router, prefix="/documents", tags=["Documents"])
+# Add chat router later:
 # app.include_router(chat.router, prefix="/chat", tags=["Chat"])
 
 
