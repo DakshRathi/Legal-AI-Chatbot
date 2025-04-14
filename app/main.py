@@ -2,9 +2,8 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 
-from app.routers import auth, documents # Import other router later (chat)
+from app.routers import auth, documents, chat, sessions
 from app.db.database import init_db, engine
-from app.core.config import settings # Import settings if needed directly
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,8 +29,8 @@ app = FastAPI(
 # Include API routers
 app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
 app.include_router(documents.router, prefix="/documents", tags=["Documents"])
-# Add chat router later:
-# app.include_router(chat.router, prefix="/chat", tags=["Chat"])
+app.include_router(chat.router, prefix="/chat", tags=["Chat"])
+app.include_router(sessions.router, prefix="/sessions", tags=["Chat Sessions"])
 
 
 @app.get("/health", tags=["Health Check"])
@@ -44,4 +43,3 @@ async def health_check():
 # import asyncio
 # if __name__ == "__main__":
 #     asyncio.run(init_db())
-

@@ -42,7 +42,6 @@ def get_vector_store() -> Chroma:
 
 # --- Core Functions ---
 
-# REVERT: Make this function synchronous again
 def add_document_to_store(doc_id: int, user_id: int, text: str):
     """
     Splits text, creates documents with metadata, and adds them to the vector store
@@ -82,20 +81,33 @@ def add_document_to_store(doc_id: int, user_id: int, text: str):
         print(traceback.format_exc())
 
 
-def get_retriever(user_id: int, doc_id: Optional[int] = None, search_k: int = 3) -> Optional[VectorStoreRetriever]:
+def get_retriever(user_id: int, doc_ids: Optional[List[int]] = None, search_k: int = 4) -> Optional[VectorStoreRetriever]:
     """
-    Creates a retriever for the vector store, filtering by user_id and optionally doc_id.
+    Creates retriever filtering by user_id and optionally a list of doc_ids.
     """
     try:
         vector_store = get_vector_store()
         search_kwargs: Dict[str, Any] = {"k": search_k}
-        if doc_id is not None:
-            filter_dict = {"$and": [{"user_id": {"$eq": user_id}}, {"doc_id": {"$eq": doc_id}}]}
-        else:
-            filter_dict = {"user_id": {"$eq": user_id}}
-        search_kwargs["filter"] = filter_dict
+
+        # --- Filter Logic for Multiple doc_ids ---
+        filters = [{"user_id": {"$eq": user_id}}] # Always filter by user
+        if doc_ids: # If a list of doc_ids is provided
+            if len(doc_ids) == 1:
+                # Optimize for single doc ID
+                filters.append({"doc_id": {"$eq": doc_ids[0]}})
+            else:
+                # Use $or for multiple doc IDs (or $in if supported reliably)
+                or_clauses = [{"doc_id": {"$eq": d_id}} for d_id in doc_ids]
+                filters.append({"$or": or_clauses})
+
+        # Combine all filters with $and
+        where_filter = {"$and": filters} if len(filters) > 1 else filters[0]
+
+        search_kwargs["filter"] = where_filter
+
         print(f"Creating retriever with search_kwargs: {search_kwargs}")
         return vector_store.as_retriever(search_kwargs=search_kwargs)
+
     except Exception as e:
         print(f"Error creating retriever: {e}")
         return None
@@ -135,7 +147,7 @@ if __name__ == '__main__':
     add_document_to_store(doc_id=test_doc_id, user_id=test_user_id, text=test_text_content)
 
     print(f"\nTesting retrieval for user_id={test_user_id}, doc_id={test_doc_id}")
-    retriever = get_retriever(user_id=test_user_id, doc_id=test_doc_id)
+    retriever = get_retriever(user_id=test_user_id, doc_id=[test_doc_id])
     if retriever:
         query = "What animals are mentioned?"
         try:
@@ -158,12 +170,12 @@ if __name__ == '__main__':
 
     # Verify deletion
     print(f"\nVerifying deletion by retrieving again...")
-    retriever_after_delete = get_retriever(user_id=test_user_id, doc_id=test_doc_id)
+    retriever_after_delete = get_retriever(user_id=test_user_id, doc_id=[test_doc_id])
     if retriever_after_delete:
         try:
             results_after_delete = retriever_after_delete.invoke(query) # Use synchronous invoke
             print(f"Retrieved {len(results_after_delete)} documents after deletion (expected 0).")
         except Exception as e:
-             print(f"ERROR during SYNC retriever invocation after delete: {e}")
+            print(f"ERROR during SYNC retriever invocation after delete: {e}")
     else:
          print("Failed to create retriever after deletion.")

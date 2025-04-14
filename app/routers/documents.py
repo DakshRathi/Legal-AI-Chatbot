@@ -5,6 +5,7 @@ from fastapi import (
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 # Local imports
 from app.db.database import get_db
@@ -180,18 +181,18 @@ async def delete_document(
     Deletes a specific document owned by the authenticated user from the SQL database
     and schedules background deletion from the vector store.
     """
-    # Find the document in SQL DB first to ensure ownership
-    query = select(Document).where(Document.id == doc_id, Document.owner_id == current_user.id)
+    # Fetch doc with associated sessions to potentially update them later if needed
+    query = select(Document).options(selectinload(Document.sessions)).where(Document.id == doc_id, Document.owner_id == current_user.id)
     result = await db.execute(query)
     document = result.scalar_one_or_none()
 
     if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Document with ID {doc_id} not found or access denied for deletion."
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found or access denied.")
 
-    # Delete from SQL DB
+    # Option 1: Remove associations manually (safer if cascade not set up correctly)
+    # document.sessions.clear() # Removes links in the association table
+
+    # Delete from SQL DB (if cascade delete is set up correctly on Session side for association, manual clear might not be needed)
     try:
         await db.delete(document)
         await db.commit()
@@ -199,18 +200,10 @@ async def delete_document(
     except Exception as e:
         await db.rollback()
         print(f"Database Error: Failed to delete document metadata: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to delete document metadata."
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to delete metadata.")
 
-    # Schedule deletion from vector store in the background
-    # Note: Vector store deletion might be slow or incomplete depending on implementation.
-    background_tasks.add_task(
-        delete_documents_from_store,
-        doc_id=doc_id,
-        user_id=current_user.id
-    )
+    # Schedule deletion from vector store
+    background_tasks.add_task(delete_documents_from_store, doc_id=doc_id, user_id=current_user.id)
     print(f"Scheduled background task for vector store deletion for doc_id {doc_id}")
 
     return {"message": f"Document ID {doc_id} deletion process initiated."}
