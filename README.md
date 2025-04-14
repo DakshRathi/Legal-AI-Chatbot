@@ -95,6 +95,7 @@ The application consists of a FastAPI backend handling API requests, ML processi
     ```
 
 5.  **Configure Environment Variables:**
+
     Create a `.env` file in the project root (`legal-ai-chatbot/.env`) with the following content, replacing placeholder values with your actual credentials/settings:
     ```
     # .env
@@ -108,7 +109,17 @@ The application consists of a FastAPI backend handling API requests, ML processi
     ```
     *   Generate a strong `SECRET_KEY` (e.g., using `openssl rand -hex 32`).
 
-6.  **Database Initialization:** The database tables will be created automatically when the FastAPI backend starts for the first time (via the `init_db` function called during application startup).
+6.  **Create Data Directory:**
+
+    Ensure that the `data` directory exists before starting the backend server:
+    ```
+    mkdir data
+    ```
+    This folder will be used to store the local SQLite database and Chroma vector store:
+    - data/sql_app.db — SQLite DB for user, documents, sessions, and messages
+    - data/chroma_db/ — ChromaDB persistence folder for document embeddings
+
+    📝 These will be automatically populated during the backend runtime, but the folder must exist.
 
 ## Running the Application
 
@@ -151,6 +162,11 @@ You need to run the backend and frontend separately.
     *   Type your question into the input box at the bottom ("Ask a legal question...") and press Enter.
     *   The chatbot will respond based on the general LLM knowledge or, if documents are linked to the active session, based on the context retrieved from those documents via the RAG pipeline.
 
+## 🧪 Demonstration Video
+
+A complete walkthrough of the Legal AI Chatbot — from server setup to document upload and chatbot interaction — is available here:
+
+📽️ [Watch the Demonstration Video](https://drive.google.com/file/d/1hVfeD4ETa4m9I5aiBIFa2-QN0s0UyziB/view?usp=sharing)
 
 ## Limitations & Future Work
 
